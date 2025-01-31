@@ -254,6 +254,7 @@ Optional arguments:
 ### `point_in_time_recovery`
 
 * `enabled` - (Required) Whether to enable point-in-time recovery. It can take 10 minutes to enable for new tables. If the `point_in_time_recovery` block is not provided, this defaults to `false`.
+* `recovery_period_in_days` - (Optional) The number of preceding days for which continuous backups are taken and maintained. The table data is only recoverable to any point-in-time from within the configured recovery period. If no value is provided, the value will default to 35.
 
 ### `replica`
 

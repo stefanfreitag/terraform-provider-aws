@@ -263,6 +263,11 @@ func resourceTable() *schema.Resource {
 							Type:     schema.TypeBool,
 							Required: true,
 						},
+						"recovery_period_in_days": {
+							Type:         schema.TypeInt,
+							Optional:     true,
+							ValidateFunc: validation.IntBetween(1, 35),
+						},
 					},
 				},
 			},
