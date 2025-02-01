@@ -266,6 +266,7 @@ func resourceTable() *schema.Resource {
 						"recovery_period_in_days": {
 							Type:         schema.TypeInt,
 							Optional:     true,
+							Computed:     true,
 							ValidateFunc: validation.IntBetween(1, 35),
 						},
 					},
@@ -2268,6 +2269,9 @@ func flattenPITR(pitrDesc *dynamodb.DescribeContinuousBackupsOutput) []interface
 		pitr := pitrDesc.ContinuousBackupsDescription.PointInTimeRecoveryDescription
 		if pitr != nil {
 			m[names.AttrEnabled] = (pitr.PointInTimeRecoveryStatus == awstypes.PointInTimeRecoveryStatusEnabled)
+		}
+		if pitr.PointInTimeRecoveryStatus == awstypes.PointInTimeRecoveryStatusEnabled {
+			m["recovery_period_in_days"] = aws.ToInt32(pitr.RecoveryPeriodInDays)
 		}
 	}
 

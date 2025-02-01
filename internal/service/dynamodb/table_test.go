@@ -604,6 +604,7 @@ func TestAccDynamoDBTable_enablePITR(t *testing.T) {
 					testAccCheckInitialTableExists(ctx, resourceName, &conf),
 					resource.TestCheckResourceAttr(resourceName, "point_in_time_recovery.#", "1"),
 					resource.TestCheckResourceAttr(resourceName, "point_in_time_recovery.0.enabled", acctest.CtTrue),
+					resource.TestCheckResourceAttr(resourceName, "point_in_time_recovery.0.recovery_period_in_days", "35"),
 				),
 			},
 		},
