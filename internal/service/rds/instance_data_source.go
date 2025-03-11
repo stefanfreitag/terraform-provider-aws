@@ -51,6 +51,10 @@ func dataSourceInstance() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
+			"database_insights_mode": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
 			"db_cluster_identifier": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -261,6 +265,7 @@ func dataSourceInstanceRead(ctx context.Context, d *schema.ResourceData, meta in
 	d.Set("backup_retention_period", instance.BackupRetentionPeriod)
 	d.Set("ca_cert_identifier", instance.CACertificateIdentifier)
 	d.Set("db_cluster_identifier", instance.DBClusterIdentifier)
+	d.Set("database_insights_mode", instance.DatabaseInsightsMode)
 	d.Set("db_instance_arn", instance.DBInstanceArn)
 	d.Set("db_instance_class", instance.DBInstanceClass)
 	d.Set("db_instance_port", instance.DbInstancePort)
