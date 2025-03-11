@@ -1076,6 +1076,10 @@ func resourceInstanceCreate(ctx context.Context, d *schema.ResourceData, meta in
 			input.PreferredBackupWindow = aws.String(v.(string))
 		}
 
+		if v := d.Get("database_insights_mode"); v.(string) != "" {
+			input.DatabaseInsightsMode = types.DatabaseInsightsMode(v.(string))
+		}
+
 		if v, ok := d.GetOk("db_subnet_group_name"); ok {
 			input.DBSubnetGroupName = aws.String(v.(string))
 		}
@@ -1981,6 +1985,8 @@ func resourceInstanceRead(ctx context.Context, d *schema.ResourceData, meta inte
 	d.Set("copy_tags_to_snapshot", v.CopyTagsToSnapshot)
 	d.Set("custom_iam_instance_profile", v.CustomIamInstanceProfile)
 	d.Set("customer_owned_ip_enabled", v.CustomerOwnedIpEnabled)
+	d.Set("database_insights_mode", v.DatabaseInsightsMode)
+
 	d.Set("db_name", v.DBName)
 	if v.DBSubnetGroup != nil {
 		d.Set("db_subnet_group_name", v.DBSubnetGroup.DBSubnetGroupName)

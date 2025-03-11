@@ -304,13 +304,14 @@ func testAccInstanceDataSourceConfig_databaseInsights(rName string) string {
 resource "aws_db_instance" "test" {
   allocated_storage           = 10
   backup_retention_period     = 0
-  database_insights_enabled   = "advanced"
+  database_insights_mode   = "advanced"
   db_subnet_group_name        = aws_db_subnet_group.test.name
   engine                      = data.aws_rds_engine_version.default.engine
   engine_version              = data.aws_rds_engine_version.default.version
   identifier                  = %[1]q
   instance_class              = data.aws_rds_orderable_db_instance.test.instance_class
   manage_master_user_password = true
+  performance_insights_enabled = true
   db_name                     = "test"
   skip_final_snapshot         = true
   username                    = "tfacctest"
