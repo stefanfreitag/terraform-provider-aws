@@ -113,10 +113,10 @@ func testAccTag_system(t *testing.T) {
 		CheckDestroy:             testAccCheckTagDestroy(ctx),
 		Steps: []resource.TestStep{
 			{
-				Config: testAccTagConfig_basic(rName, "aws:transfer:customHostname", "abc.example.com"),
+				Config: testAccTagConfig_basic(rName, "transfer:customHostname", "abc.example.com"),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckTagExists(ctx, resourceName),
-					resource.TestCheckResourceAttr(resourceName, names.AttrKey, "aws:transfer:customHostname"),
+					resource.TestCheckResourceAttr(resourceName, names.AttrKey, "transfer:customHostname"),
 					resource.TestCheckResourceAttr(resourceName, names.AttrValue, "abc.example.com"),
 				),
 			},
