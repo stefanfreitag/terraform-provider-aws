@@ -432,6 +432,44 @@ func testAccApp_CustomRules(t *testing.T) {
 	})
 }
 
+func TestAccApp_JobConfig(t *testing.T) {
+	ctx := acctest.Context(t)
+	var app types.App
+	rName := sdkacctest.RandomWithPrefix(acctest.ResourcePrefix)
+	resourceName := "aws_amplify_app.test"
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { acctest.PreCheck(ctx, t); testAccPreCheck(t) },
+		ErrorCheck:               acctest.ErrorCheck(t, names.AmplifyServiceID),
+		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories,
+		CheckDestroy:             testAccCheckAppDestroy(ctx),
+		Steps: []resource.TestStep{
+			{
+				//TODO
+				Config: testAccAppConfig_jobConfig(rName, "AMPLIFY_MANAGED"),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckAppExists(ctx, resourceName, &app),
+					resource.TestCheckResourceAttr(resourceName, "cache_config.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "cache_config.0.type", "AMPLIFY_MANAGED"),
+				),
+			},
+			{
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+			{
+				Config: testAccAppConfig_jobConfig(rName, "AMPLIFY_MANAGED_NO_COOKIES"),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckAppExists(ctx, resourceName, &app),
+					resource.TestCheckResourceAttr(resourceName, "cache_config.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "cache_config.0.type", "AMPLIFY_MANAGED_NO_COOKIES"),
+				),
+			},
+		},
+	})
+}
+
 func testAccApp_Description(t *testing.T) {
 	ctx := acctest.Context(t)
 	var app types.App
@@ -1037,4 +1075,16 @@ resource "aws_amplify_app" "test" {
   access_token = %[3]q
 }
 `, rName, repository, accessToken)
+}
+
+func testAccAppConfig_jobConfig(rName, buildComputeType string) string {
+	return fmt.Sprintf(`
+resource "aws_amplify_app" "test" {
+  name = %[1]q
+
+  job_config {
+    build_compute_type = %[2]q
+  }
+}
+`, rName, buildComputeType)
 }
