@@ -432,7 +432,7 @@ func testAccApp_CustomRules(t *testing.T) {
 	})
 }
 
-func TestAccApp_JobConfig(t *testing.T) {
+func testAccApp_JobConfig(t *testing.T) {
 	ctx := acctest.Context(t)
 	var app types.App
 	rName := sdkacctest.RandomWithPrefix(acctest.ResourcePrefix)
@@ -446,11 +446,11 @@ func TestAccApp_JobConfig(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				//TODO
-				Config: testAccAppConfig_jobConfig(rName, "AMPLIFY_MANAGED"),
+				Config: testAccAppConfig_jobConfig(rName, "LARGE_16GB"),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckAppExists(ctx, resourceName, &app),
-					resource.TestCheckResourceAttr(resourceName, "cache_config.#", "1"),
-					resource.TestCheckResourceAttr(resourceName, "cache_config.0.type", "AMPLIFY_MANAGED"),
+					resource.TestCheckResourceAttr(resourceName, "job_config.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "job_config.0.build_compute_type", "LARGE_16GB"),
 				),
 			},
 			{
@@ -459,11 +459,11 @@ func TestAccApp_JobConfig(t *testing.T) {
 				ImportStateVerify: true,
 			},
 			{
-				Config: testAccAppConfig_jobConfig(rName, "AMPLIFY_MANAGED_NO_COOKIES"),
+				Config: testAccAppConfig_jobConfig(rName, "STANDARD_8GB"),
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckAppExists(ctx, resourceName, &app),
-					resource.TestCheckResourceAttr(resourceName, "cache_config.#", "1"),
-					resource.TestCheckResourceAttr(resourceName, "cache_config.0.type", "AMPLIFY_MANAGED_NO_COOKIES"),
+					resource.TestCheckResourceAttr(resourceName, "job_config.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "job_config.0.build_compute_type", "STANDARD_8GB"),
 				),
 			},
 		},
