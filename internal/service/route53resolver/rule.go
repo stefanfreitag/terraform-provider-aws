@@ -51,6 +51,11 @@ func resourceRule() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
+			"delegation_record:": {
+				Type:         schema.TypeString,
+				Optional:     true,
+				ValidateFunc: validation.StringLenBetween(1, 256),
+			},
 			names.AttrDomainName: {
 				Type:         schema.TypeString,
 				Required:     true,
@@ -125,9 +130,16 @@ func resourceRuleCreate(ctx context.Context, d *schema.ResourceData, meta any) d
 
 	input := &route53resolver.CreateResolverRuleInput{
 		CreatorRequestId: aws.String(id.PrefixedUniqueId("tf-r53-resolver-rule-")),
-		DomainName:       aws.String(d.Get(names.AttrDomainName).(string)),
 		RuleType:         awstypes.RuleTypeOption(d.Get("rule_type").(string)),
 		Tags:             getTagsIn(ctx),
+	}
+
+	if v, ok := d.GetOk("delegation_record"); ok {
+		input.DelegationRecord = aws.String(v.(string))
+	}
+
+	if v, ok := d.GetOk(names.AttrDomainName); ok {
+		input.DomainName = aws.String(v.(string))
 	}
 
 	if v, ok := d.GetOk(names.AttrName); ok {
@@ -174,6 +186,9 @@ func resourceRuleRead(ctx context.Context, d *schema.ResourceData, meta any) dia
 	}
 
 	d.Set(names.AttrARN, rule.Arn)
+
+	//TODO DomainName not working with delegate_record
+	d.Set("delegation_record", rule.DelegationRecord)
 	// To be consistent with other AWS services that do not accept a trailing period,
 	// we remove the suffix from the Domain Name returned from the API
 	d.Set(names.AttrDomainName, trimTrailingPeriod(aws.ToString(rule.DomainName)))
