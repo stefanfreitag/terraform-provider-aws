@@ -227,6 +227,43 @@ func TestAccRoute53ResolverRule_updateName(t *testing.T) {
 	})
 }
 
+func TestAccRoute53ResolverRule_delegate(t *testing.T) {
+	ctx := acctest.Context(t)
+	var rule1 awstypes.ResolverRule
+	resourceName := "aws_route53_resolver_rule.test"
+	domainName := acctest.RandomDomainName()
+	rName := sdkacctest.RandomWithPrefix(acctest.ResourcePrefix)
+
+	resource.ParallelTest(t, resource.TestCase{
+		PreCheck:                 func() { acctest.PreCheck(ctx, t); testAccPreCheck(ctx, t) },
+		ErrorCheck:               acctest.ErrorCheck(t, names.Route53ResolverServiceID),
+		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories,
+		CheckDestroy:             testAccCheckRuleDestroy(ctx),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccRuleConfig_delegate(rName, domainName),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckRuleExists(ctx, resourceName, &rule1),
+					resource.TestCheckResourceAttr(resourceName, names.AttrDomainName, domainName),
+					resource.TestCheckResourceAttr(resourceName, names.AttrName, rName),
+					resource.TestCheckResourceAttr(resourceName, "rule_type", "FORWARD"),
+					resource.TestCheckResourceAttrPair(resourceName, "resolver_endpoint_id", ep1ResourceName, names.AttrID),
+					resource.TestCheckResourceAttr(resourceName, "target_ip.#", "1"),
+					resource.TestCheckTypeSetElemNestedAttrs(resourceName, "target_ip.*", map[string]string{
+						"ip":           "192.0.2.6",
+						names.AttrPort: "53",
+					}),
+				),
+			},
+			{
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
+		},
+	})
+}
+
 func TestAccRoute53ResolverRule_forward(t *testing.T) {
 	ctx := acctest.Context(t)
 	var rule1, rule2, rule3 awstypes.ResolverRule
@@ -670,6 +707,21 @@ resource "aws_route53_resolver_rule" "test" {
 `, rName, domainName)
 }
 
+func testAccRuleConfig_delegate(rName, domainName string) string {
+	return acctest.ConfigCompose(testAccRuleConfig_resolverEndpointBase(rName), fmt.Sprintf(`
+resource "aws_route53_resolver_rule" "test" {
+  domain_name = %[2]q
+  rule_type   = "FORWARD"
+  name        = %[1]q
+
+  resolver_endpoint_id = aws_route53_resolver_endpoint.test[0].id
+
+  target_ip {
+    ip = "192.0.2.6"
+  }
+}
+`, rName, domainName))
+}
 func testAccRuleConfig_forward(rName, domainName string) string {
 	return acctest.ConfigCompose(testAccRuleConfig_resolverEndpointBase(rName), fmt.Sprintf(`
 resource "aws_route53_resolver_rule" "test" {

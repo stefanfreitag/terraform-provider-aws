@@ -51,14 +51,15 @@ func resourceRule() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
-			"delegation_record:": {
+			"delegation_record": {
 				Type:         schema.TypeString,
 				Optional:     true,
 				ValidateFunc: validation.StringLenBetween(1, 256),
+				// TODO: ? StateFunc:    trimTrailingPeriod,
 			},
 			names.AttrDomainName: {
 				Type:         schema.TypeString,
-				Required:     true,
+				Optional:     true,
 				ForceNew:     true,
 				ValidateFunc: validation.StringLenBetween(1, 256),
 				StateFunc:    trimTrailingPeriod,
