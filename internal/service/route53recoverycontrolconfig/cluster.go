@@ -18,11 +18,13 @@ import (
 	"github.com/hashicorp/terraform-provider-aws/internal/enum"
 	"github.com/hashicorp/terraform-provider-aws/internal/errs"
 	"github.com/hashicorp/terraform-provider-aws/internal/errs/sdkdiag"
+	tftags "github.com/hashicorp/terraform-provider-aws/internal/tags"
 	"github.com/hashicorp/terraform-provider-aws/internal/tfresource"
 	"github.com/hashicorp/terraform-provider-aws/names"
 )
 
 // @SDKResource("aws_route53recoverycontrolconfig_cluster", name="Cluster")
+// @Tags(identifierAttribute="arn")
 func resourceCluster() *schema.Resource {
 	return &schema.Resource{
 		CreateWithoutTimeout: resourceClusterCreate,
@@ -69,6 +71,8 @@ func resourceCluster() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
+			names.AttrTags:    tftags.TagsSchema(),
+			names.AttrTagsAll: tftags.TagsSchemaComputed(),
 		},
 	}
 }
@@ -103,6 +107,9 @@ func resourceClusterCreate(ctx context.Context, d *schema.ResourceData, meta any
 		return sdkdiag.AppendErrorf(diags, "waiting for Route53 Recovery Control Config Cluster (%s) to be Deployed: %s", d.Id(), err)
 	}
 
+	if err := createTags(ctx, conn, d.Id(), getTagsIn(ctx)); err != nil {
+		return sdkdiag.AppendErrorf(diags, "setting Route53 Recovery Control Config Cluster (%s) tags: %s", d.Id(), err)
+	}
 	return append(diags, resourceClusterRead(ctx, d, meta)...)
 }
 
