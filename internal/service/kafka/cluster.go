@@ -205,6 +205,19 @@ func resourceCluster() *schema.Resource {
 												},
 											},
 										},
+									"zookeeper_access": {
+										Type:     schema.TypeList,
+										Optional: true,
+										MaxItems: 1,
+										Elem: &schema.Resource{
+											Schema: map[string]*schema.Schema{
+												names.AttrEnabled: {
+													Type:     schema.TypeBool,
+													Optional: true,
+												},
+											},
+										},
+									},
 									},
 								},
 							},
@@ -588,15 +601,20 @@ func resourceClusterCreate(ctx context.Context, d *schema.ResourceData, meta any
 
 	var vpcConnectivity *types.VpcConnectivity
 	var networkType types.NetworkType
+	var zookeeperAccess *types.ZookeeperAccess
 	if v, ok := d.GetOk("broker_node_group_info"); ok && len(v.([]any)) > 0 && v.([]any)[0] != nil {
 		input.BrokerNodeGroupInfo = expandBrokerNodeGroupInfo(v.([]any)[0].(map[string]any))
-		// "BadRequestException: When creating a cluster, all vpcConnectivity auth schemes must be disabled (‘enabled’ : false). You can enable auth schemes after the cluster is created"
+		// "BadRequestException: When creating a cluster, all vpcConnectivity auth schemes must be disabled ('enabled' : false). You can enable auth schemes after the cluster is created"
 		if input.BrokerNodeGroupInfo != nil && input.BrokerNodeGroupInfo.ConnectivityInfo != nil {
 			vpcConnectivity = input.BrokerNodeGroupInfo.ConnectivityInfo.VpcConnectivity
 			input.BrokerNodeGroupInfo.ConnectivityInfo.VpcConnectivity = nil
 
 			networkType = input.BrokerNodeGroupInfo.ConnectivityInfo.NetworkType
 			input.BrokerNodeGroupInfo.ConnectivityInfo.NetworkType = types.NetworkTypeIpv4
+		}
+		// ZookeeperAccess is not part of ConnectivityInfo in CreateCluster — must be applied post-create via UpdateConnectivity.
+		if v2, ok := d.GetOk("broker_node_group_info.0.connectivity_info.0.zookeeper_access"); ok && len(v2.([]any)) > 0 && v2.([]any)[0] != nil {
+			zookeeperAccess = expandZookeeperAccess(v2.([]any)[0].(map[string]any))
 		}
 	}
 
@@ -688,6 +706,30 @@ func resourceClusterCreate(ctx context.Context, d *schema.ResourceData, meta any
 
 		if err != nil {
 			return sdkdiag.AppendErrorf(diags, "updating MSK Cluster (%s) broker connectivity: %s", d.Id(), err)
+		}
+
+		clusterOperationARN := aws.ToString(output.ClusterOperationArn)
+
+		if _, err := waitClusterOperationCompleted(ctx, conn, clusterOperationARN, d.Timeout(schema.TimeoutCreate)); err != nil {
+			return sdkdiag.AppendErrorf(diags, "waiting for MSK Cluster (%s) operation (%s) complete: %s", d.Id(), clusterOperationARN, err)
+		}
+	}
+
+	if zookeeperAccess != nil {
+		if err := refreshClusterVersion(ctx, d, meta); err != nil {
+			return sdkdiag.AppendFromErr(diags, err)
+		}
+
+		input := kafka.UpdateConnectivityInput{
+			ClusterArn:      aws.String(d.Id()),
+			ZookeeperAccess: zookeeperAccess,
+			CurrentVersion:  aws.String(d.Get("current_version").(string)),
+		}
+
+		output, err := conn.UpdateConnectivity(ctx, &input)
+
+		if err != nil {
+			return sdkdiag.AppendErrorf(diags, "updating MSK Cluster (%s) zookeeper access: %s", d.Id(), err)
 		}
 
 		clusterOperationARN := aws.ToString(output.ClusterOperationArn)
@@ -804,6 +846,34 @@ func resourceClusterUpdate(ctx context.Context, d *schema.ResourceData, meta any
 			connectivityInfo.NetworkType = types.NetworkType(v.(string))
 		}
 		input.ConnectivityInfo = &connectivityInfo
+
+		output, err := conn.UpdateConnectivity(ctx, &input)
+
+		if err != nil {
+			return sdkdiag.AppendErrorf(diags, "updating MSK Cluster (%s) broker connectivity: %s", d.Id(), err)
+		}
+
+		clusterOperationARN := aws.ToString(output.ClusterOperationArn)
+
+		if _, err := waitClusterOperationCompleted(ctx, conn, clusterOperationARN, d.Timeout(schema.TimeoutUpdate)); err != nil {
+			return sdkdiag.AppendErrorf(diags, "waiting for MSK Cluster (%s) operation (%s) complete: %s", d.Id(), clusterOperationARN, err)
+		}
+
+		// refresh the current_version attribute after each update
+		if err := refreshClusterVersion(ctx, d, meta); err != nil {
+			return sdkdiag.AppendFromErr(diags, err)
+		}
+	}
+
+	if d.HasChange("broker_node_group_info.0.connectivity_info.0.zookeeper_access") {
+		input := kafka.UpdateConnectivityInput{
+			ClusterArn:     aws.String(d.Id()),
+			CurrentVersion: aws.String(d.Get("current_version").(string)),
+		}
+
+		if v, ok := d.GetOk("broker_node_group_info.0.connectivity_info.0.zookeeper_access"); ok && len(v.([]any)) > 0 && v.([]any)[0] != nil {
+			input.ZookeeperAccess = expandZookeeperAccess(v.([]any)[0].(map[string]any))
+		}
 
 		output, err := conn.UpdateConnectivity(ctx, &input)
 
@@ -1164,7 +1234,15 @@ func resourceClusterFlatten(ctx context.Context, cluster *types.ClusterInfo, out
 	d.Set("bootstrap_brokers_vpc_connectivity_sasl_scram", sortEndpointsString(aws.ToString(outputGBB.BootstrapBrokerStringVpcConnectivitySaslScram)))
 	d.Set("bootstrap_brokers_vpc_connectivity_tls", sortEndpointsString(aws.ToString(outputGBB.BootstrapBrokerStringVpcConnectivityTls)))
 	if cluster.BrokerNodeGroupInfo != nil {
-		if err := d.Set("broker_node_group_info", []any{flattenBrokerNodeGroupInfo(cluster.BrokerNodeGroupInfo)}); err != nil {
+		brokerInfo := flattenBrokerNodeGroupInfo(cluster.BrokerNodeGroupInfo)
+		// ZookeeperAccess is not returned by DescribeCluster; preserve the existing state value
+		// so that reads do not wipe user-configured or previously applied values.
+		if connInfo, ok := brokerInfo["connectivity_info"].([]any); ok && len(connInfo) > 0 {
+			if ciMap, ok := connInfo[0].(map[string]any); ok {
+				ciMap["zookeeper_access"] = d.Get("broker_node_group_info.0.connectivity_info.0.zookeeper_access")
+			}
+		}
+		if err := d.Set("broker_node_group_info", []any{brokerInfo}); err != nil {
 			return fmt.Errorf("setting broker_node_group_info: %w", err)
 		}
 	} else {
@@ -1582,6 +1660,20 @@ func expandPublicAccess(tfMap map[string]any) *types.PublicAccess {
 
 	if v, ok := tfMap[names.AttrType].(string); ok && v != "" {
 		apiObject.Type = aws.String(v)
+	}
+
+	return apiObject
+}
+
+func expandZookeeperAccess(tfMap map[string]any) *types.ZookeeperAccess {
+	if tfMap == nil {
+		return nil
+	}
+
+	apiObject := &types.ZookeeperAccess{}
+
+	if v, ok := tfMap[names.AttrEnabled].(bool); ok {
+		apiObject.Enabled = aws.Bool(v)
 	}
 
 	return apiObject
@@ -2044,6 +2136,7 @@ func flattenPublicAccess(apiObject *types.PublicAccess) map[string]any {
 	if v := apiObject.Type; v != nil {
 		tfMap[names.AttrType] = aws.ToString(v)
 	}
+
 
 	return tfMap
 }
