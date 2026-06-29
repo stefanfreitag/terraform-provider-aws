@@ -2407,7 +2407,7 @@ resource "aws_msk_cluster" "test" {
 `, rName))
 }
 
-func testAccClusterConfig_encryptionInfoEncryptionAtRestKMSKeyARN(rName string) string { // nosemgrep:ci.msk-in-func-name
+func testAccClusterConfig_encryptionInfoEncryptionAtRestKMSKeyARN(rName string) string {
 	return acctest.ConfigCompose(testAccClusterConfig_base(rName), fmt.Sprintf(`
 resource "aws_kms_key" "example_key" {
   description             = %[1]q
@@ -3060,4 +3060,207 @@ resource "aws_msk_cluster" "test" {
   }
 }
 `, rName, networkType))
+}
+
+func TestAccKafkaCluster_brokerNodeGroupInfo_zookeeperAccess(t *testing.T) {
+	ctx := acctest.Context(t)
+	var cluster types.ClusterInfo
+	rName := acctest.RandomWithPrefix(t, acctest.ResourcePrefix)
+	resourceName := "aws_msk_cluster.test"
+
+	acctest.ParallelTest(ctx, t, resource.TestCase{
+		PreCheck:                 func() { acctest.PreCheck(ctx, t); testAccPreCheck(ctx, t) },
+		ErrorCheck:               acctest.ErrorCheck(t, names.KafkaServiceID),
+		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories,
+		CheckDestroy:             testAccCheckClusterDestroy(ctx, t),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccClusterConfig_brokerNodeGroupInfoZookeeperAccessDisabled(rName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckClusterExists(ctx, t, resourceName, &cluster),
+					resource.TestCheckResourceAttr(resourceName, "broker_node_group_info.0.connectivity_info.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "broker_node_group_info.0.connectivity_info.0.zookeeper_access.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "broker_node_group_info.0.connectivity_info.0.zookeeper_access.0.enabled", acctest.CtFalse),
+				),
+			},
+			{
+				Config: testAccClusterConfig_brokerNodeGroupInfoZookeeperAccessEnabled(rName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckClusterExists(ctx, t, resourceName, &cluster),
+					resource.TestCheckResourceAttr(resourceName, "broker_node_group_info.0.connectivity_info.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "broker_node_group_info.0.connectivity_info.0.zookeeper_access.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "broker_node_group_info.0.connectivity_info.0.zookeeper_access.0.enabled", acctest.CtTrue),
+				),
+			},
+			{
+				Config: testAccClusterConfig_brokerNodeGroupInfoZookeeperAccessOmitted(rName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					testAccCheckClusterExists(ctx, t, resourceName, &cluster),
+					resource.TestCheckResourceAttr(resourceName, "broker_node_group_info.0.connectivity_info.#", "1"),
+					resource.TestCheckResourceAttr(resourceName, "broker_node_group_info.0.connectivity_info.0.zookeeper_access.#", "0"),
+				),
+			},
+			{
+				ResourceName:            resourceName,
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"broker_node_group_info.0.connectivity_info.0.zookeeper_access"},
+			},
+		},
+	})
+}
+
+func testAccClusterConfig_brokerNodeGroupInfoZookeeperAccessDisabled(rName string) string {
+	return acctest.ConfigCompose(
+		testAccClusterConfig_allowEveryoneNoACLFoundFalse(rName),
+		acctest.ConfigVPCWithSubnetsIPv6(rName, 3),
+		fmt.Sprintf(`
+resource "aws_security_group" "test" {
+  name   = %[1]q
+  vpc_id = aws_vpc.test.id
+
+  tags = {
+    Name = %[1]q
+  }
+}
+
+resource "aws_msk_cluster" "test" {
+  cluster_name           = %[1]q
+  kafka_version          = "3.8.x"
+  number_of_broker_nodes = 3
+
+  broker_node_group_info {
+    client_subnets  = aws_subnet.test[*].id
+    instance_type   = "kafka.m7g.large"
+    security_groups = [aws_security_group.test.id]
+
+    connectivity_info {
+      zookeeper_access {
+        enabled = false
+      }
+    }
+
+    storage_info {
+      ebs_storage_info {
+        volume_size = 10
+      }
+    }
+  }
+
+  client_authentication {
+    sasl {
+      scram = true
+    }
+  }
+}
+`, rName))
+}
+
+func testAccClusterConfig_brokerNodeGroupInfoZookeeperAccessEnabled(rName string) string {
+	return acctest.ConfigCompose(
+		testAccClusterConfig_allowEveryoneNoACLFoundFalse(rName),
+		acctest.ConfigVPCWithSubnetsIPv6(rName, 3),
+		fmt.Sprintf(`
+resource "aws_security_group" "test" {
+  name   = %[1]q
+  vpc_id = aws_vpc.test.id
+
+  tags = {
+    Name = %[1]q
+  }
+}
+
+resource "aws_msk_cluster" "test" {
+  cluster_name           = %[1]q
+  kafka_version          = "3.8.x"
+  number_of_broker_nodes = 3
+
+  broker_node_group_info {
+    client_subnets  = aws_subnet.test[*].id
+    instance_type   = "kafka.m7g.large"
+    security_groups = [aws_security_group.test.id]
+
+    connectivity_info {
+      zookeeper_access {
+        enabled = true
+      }
+    }
+
+    storage_info {
+      ebs_storage_info {
+        volume_size = 10
+      }
+    }
+  }
+
+  client_authentication {
+    sasl {
+      scram = true
+    }
+  }
+}
+`, rName))
+}
+func testAccClusterConfig_brokerNodeGroupInfoZookeeperAccessOmitted(rName string) string {
+	return acctest.ConfigCompose(
+testAccClusterConfig_allowEveryoneNoACLFoundFalse(rName),
+acctest.ConfigVPCWithSubnetsIPv6(rName, 3),
+fmt.Sprintf(`
+resource "aws_security_group" "test" {
+  name   = %[1]q
+  vpc_id = aws_vpc.test.id
+  tags = {
+    Name = %[1]q
+  }
+}
+resource "aws_msk_cluster" "test" {
+  cluster_name           = %[1]q
+  kafka_version          = "3.8.x"
+  number_of_broker_nodes = 3
+  broker_node_group_info {
+    client_subnets  = aws_subnet.test[*].id
+    instance_type   = "kafka.m7g.large"
+    security_groups = [aws_security_group.test.id]
+    connectivity_info {}
+    storage_info {
+      ebs_storage_info {
+        volume_size = 10
+      }
+    }
+  }
+  client_authentication {
+    sasl {
+      scram = true
+    }
+  }
+}
+`, rName))
+}
+func TestAccKafkaCluster_brokerNodeGroupInfoZookeeperAccess_enabledFirst(t *testing.T) {
+	ctx := acctest.Context(t)
+	var cluster types.ClusterInfo
+	resourceName := "aws_msk_cluster.test"
+	rName := acctest.RandomWithPrefix(t, acctest.ResourcePrefix)
+	acctest.ParallelTest(ctx, t, resource.TestCase{
+PreCheck:                 func() { acctest.PreCheck(ctx, t); testAccPreCheck(ctx, t) },
+		ErrorCheck:               acctest.ErrorCheck(t, names.KafkaServiceID),
+		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories,
+		CheckDestroy:             testAccCheckClusterDestroy(ctx, t),
+		Steps: []resource.TestStep{
+			{
+				Config: testAccClusterConfig_brokerNodeGroupInfoZookeeperAccessEnabled(rName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+testAccCheckClusterExists(ctx, t, resourceName, &cluster),
+					resource.TestCheckResourceAttr(resourceName, "broker_node_group_info.0.connectivity_info.0.zookeeper_access.0.enabled", acctest.CtTrue),
+				),
+			},
+			{
+				Config: testAccClusterConfig_brokerNodeGroupInfoZookeeperAccessDisabled(rName),
+				Check: resource.ComposeAggregateTestCheckFunc(
+testAccCheckClusterExists(ctx, t, resourceName, &cluster),
+					resource.TestCheckResourceAttr(resourceName, "broker_node_group_info.0.connectivity_info.0.zookeeper_access.0.enabled", acctest.CtFalse),
+				),
+			},
+		},
+	})
 }

@@ -136,6 +136,18 @@ func dataSourceCluster() *schema.Resource {
 												},
 											},
 										},
+										"zookeeper_access": {
+											Type:     schema.TypeList,
+											Computed: true,
+											Elem: &schema.Resource{
+												Schema: map[string]*schema.Schema{
+													names.AttrEnabled: {
+														Type:     schema.TypeBool,
+														Computed: true,
+													},
+												},
+											},
+										},
 									},
 								},
 							},
