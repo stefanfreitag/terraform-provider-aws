@@ -122,7 +122,11 @@ func TestAccKafkaCluster_basic(t *testing.T) {
 	resourceName := "aws_msk_cluster.test"
 
 	acctest.ParallelTest(ctx, t, resource.TestCase{
-		PreCheck:                 func() { acctest.PreCheck(ctx, t); testAccPreCheck(ctx, t) },
+		PreCheck: func() {
+			acctest.PreCheck(ctx, t)
+			acctest.PreCheckPartitionHasService(t, names.Kafka)
+			testAccPreCheck(ctx, t)
+		},
 		ErrorCheck:               acctest.ErrorCheck(t, names.KafkaServiceID),
 		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories,
 		CheckDestroy:             testAccCheckClusterDestroy(ctx, t),
@@ -3064,6 +3068,10 @@ resource "aws_msk_cluster" "test" {
 
 func TestAccKafkaCluster_brokerNodeGroupInfo_zookeeperAccess(t *testing.T) {
 	ctx := acctest.Context(t)
+	if testing.Short() {
+		t.Skip("skipping long-running test in short mode")
+	}
+
 	var cluster types.ClusterInfo
 	rName := acctest.RandomWithPrefix(t, acctest.ResourcePrefix)
 	resourceName := "aws_msk_cluster.test"
@@ -3238,11 +3246,19 @@ resource "aws_msk_cluster" "test" {
 }
 func TestAccKafkaCluster_brokerNodeGroupInfoZookeeperAccess_enabledFirst(t *testing.T) {
 	ctx := acctest.Context(t)
+	if testing.Short() {
+		t.Skip("skipping long-running test in short mode")
+	}
+
 	var cluster types.ClusterInfo
 	resourceName := "aws_msk_cluster.test"
 	rName := acctest.RandomWithPrefix(t, acctest.ResourcePrefix)
 	acctest.ParallelTest(ctx, t, resource.TestCase{
-PreCheck:                 func() { acctest.PreCheck(ctx, t); testAccPreCheck(ctx, t) },
+		PreCheck: func() {
+			acctest.PreCheck(ctx, t)
+			acctest.PreCheckPartitionHasService(t, names.Kafka)
+			testAccPreCheck(ctx, t)
+		},
 		ErrorCheck:               acctest.ErrorCheck(t, names.KafkaServiceID),
 		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories,
 		CheckDestroy:             testAccCheckClusterDestroy(ctx, t),
