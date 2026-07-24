@@ -873,6 +873,9 @@ func resourceClusterUpdate(ctx context.Context, d *schema.ResourceData, meta any
 
 		if v, ok := d.GetOk("broker_node_group_info.0.connectivity_info.0.zookeeper_access"); ok && len(v.([]any)) > 0 && v.([]any)[0] != nil {
 			input.ZookeeperAccess = expandZookeeperAccess(v.([]any)[0].(map[string]any))
+		} else {
+			// Disable when a previously configured zookeeper_access block is removed.
+			input.ZookeeperAccess = &types.ZookeeperAccess{Enabled: aws.Bool(false)}
 		}
 
 		output, err := conn.UpdateConnectivity(ctx, &input)
