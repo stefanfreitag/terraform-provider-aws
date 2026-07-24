@@ -205,19 +205,19 @@ func resourceCluster() *schema.Resource {
 												},
 											},
 										},
-									"zookeeper_access": {
-										Type:     schema.TypeList,
-										Optional: true,
-										MaxItems: 1,
-										Elem: &schema.Resource{
-											Schema: map[string]*schema.Schema{
-												names.AttrEnabled: {
-													Type:     schema.TypeBool,
-													Optional: true,
+										"zookeeper_access": {
+											Type:     schema.TypeList,
+											Optional: true,
+											MaxItems: 1,
+											Elem: &schema.Resource{
+												Schema: map[string]*schema.Schema{
+													names.AttrEnabled: {
+														Type:     schema.TypeBool,
+														Optional: true,
+													},
 												},
 											},
 										},
-									},
 									},
 								},
 							},
@@ -2139,7 +2139,6 @@ func flattenPublicAccess(apiObject *types.PublicAccess) map[string]any {
 	if v := apiObject.Type; v != nil {
 		tfMap[names.AttrType] = aws.ToString(v)
 	}
-
 
 	return tfMap
 }
